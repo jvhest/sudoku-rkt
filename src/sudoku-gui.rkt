@@ -15,8 +15,8 @@
      sudoku)
 
     (define BOARD-MARGIN 25)
-    (define CELL-WIDTH 75)
-    (define MAX-BORDER (+ BOARD-MARGIN (* CELL-WIDTH 9)))
+    (define CELL-WIDTH 85)
+    (define MAX-BORDER (* CELL-WIDTH 9))
     (define FONT-W 27)
     (define FONT-H 63)
     (define X-OFFSET (round (/ (- CELL-WIDTH FONT-W) 2)))
@@ -28,86 +28,88 @@
                           #:weight 'bold
                           #:size-in-pixels? #t))
 
+    (define font-buttons (make-font
+                          #:size 20
+                          #:family 'modern
+                          #:weight 'semibold
+                          #:size-in-pixels? #t))
+    
     (define main-frame (new frame%
-                            [label "I'm a SUDOKU!"]
-                            [width (+ (* 9 CELL-WIDTH) (* 2 BOARD-MARGIN))]
-                            [height (+ (* 10 CELL-WIDTH) (* 2 BOARD-MARGIN))]))
+                            [label "I'm a SUDOKU!"]))
 
-    (define/public (show-frame)
+    (define/public (start-gui)
       (send main-frame show #t))
 
-
-    ;; Private
     (super-new)
     
     ; Make a static text message in the frame
     (define msg (new message%
                      [parent main-frame]
-                     [stretchable-height #f]
+                     [min-height 30]
+                     [vert-margin 10]
+                     [font font-buttons]
                      [label "No events so far for mouse..."]))
 
     ; Derive a new canvas (a drawing window) class to handle events
     (define sudoku-canvas%
       (class canvas%
         (inherit
-          get-width
-          get-height
-          refresh)
+         ;; get-width
+         ;; get-height
+         refresh)
 
         ; Define overriding method to handle mouse events
         (define/override (on-event event)
           (cond
             [(send event get-left-down)
              (let-values ([(x y) (values (send event get-x) (send event get-y))])
-               (when (not (or
-                           (< x BOARD-MARGIN) (< y BOARD-MARGIN)
-                           (> x (+ (* CELL-WIDTH 9) BOARD-MARGIN))
-                           (> y (+ (* CELL-WIDTH 9) BOARD-MARGIN))))
-                 (let-values ([(row col) (pixel-to-cursor x y)])
-                   (send sudoku set-cursor row col)
-                   (send main-frame refresh)
-                   (send msg set-label
-                         (format "(x,y) -> ~a,~a | (r,c) -> ~a,~a" x y row col)))))]))
+               (let-values ([(row col) (pixel-to-cursor x y)])
+                 (send sudoku set-cursor row col)
+                 (send main-frame refresh)
+                 (send msg set-label
+                       (format "(x,y) -> ~a,~a | (r,c) -> ~a,~a" x y row col))))]))
 
         ; Define overriding method to handle keyboard events
         (define/override (on-char key-event)
           (when (equal? (send key-event get-key-release-code) 'press)
-            (let ([n (send key-event get-key-code)])
-;;               (display "key ~a\n" n)
-              (cond
-                [(member n (list #\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9))
-                 (begin
-                   (send sudoku set-cursor-val (- (char->integer n) 48))
-                   (send main-frame refresh))]
-                [(equal? n #\?)
-                 (begin
-                   (send sudoku set-cursor-val (send sudoku get-cursor-solved))
-                   (send main-frame refresh))]
-                [(equal? n #\!)
-                 (begin
-                   (set-field! easy sudoku (not (get-field easy sudoku)))
-                   (send main-frame refresh))]
-                [(member n (list 'up #\k 'down #\j 'left #\h 'right #\l))
-                 (when (send sudoku move-cursor n)
-                   (send main-frame refresh))]
-                [(equal? n #\s)
-                 (begin
-                   (send sudoku show-solved)
-                   (send sudoku print-puzzle)
-                   (send main-frame refresh))]))))
+            (let-values ([(cursor-r cursor-c) (send sudoku get-cursor)])
+              (let ([n (send key-event get-key-code)])
+                (cond
+                  [(member n (list #\0 #\1 #\2 #\3 #\4 #\5 #\6 #\7 #\8 #\9))
+                   (begin
+                     (send sudoku set-value cursor-r cursor-c n)
+                     (send main-frame refresh))]
+                  ;; give hint for current cell
+                  [(equal? n #\?)
+                   (begin
+                     (send sudoku set-value cursor-r cursor-c
+                           (send sudoku get-value cursor-r cursor-c #:mode 'solved))
+                     (send main-frame refresh))]
+                  [(member n (list 'up 'down 'left 'right))
+                   (when (send sudoku move-cursor n)
+                     (send main-frame refresh))]
+                  ;; show sudoku solution
+                  [(equal? n #\s)
+                   (begin
+                     (send sudoku show-solved)
+                     (send sudoku print-puzzle)
+                     (send main-frame refresh))])))))
 
         ; Call the superclass init, passing on all init args
         (super-new)
 
         (define/private (pixel-to-cursor x y)
           (values 
-           (add1 (quotient (- y BOARD-MARGIN) CELL-WIDTH))   ; row
-           (add1 (quotient (- x BOARD-MARGIN) CELL-WIDTH)))) ; column
-
+           (add1 (quotient y CELL-WIDTH))   ; row
+           (add1 (quotient x CELL-WIDTH)))) ; column
         ))
 
     (new sudoku-canvas%
          [parent main-frame]
+         [min-width (* 9 CELL-WIDTH)]
+         [min-height (* 9 CELL-WIDTH)]
+         [vert-margin BOARD-MARGIN]
+         [horiz-margin BOARD-MARGIN]
          [paint-callback
           (λ (canvas dc)
             (send dc set-smoothing 'smoothed)
@@ -125,19 +127,14 @@
           (if (set-member? dbl-set i)
               (send dc set-pen "black" 3 'solid)
               (send dc set-pen "black" 1 'solid))
-          (set! offset (+ BOARD-MARGIN (* i CELL-WIDTH)))
-          (send dc draw-line BOARD-MARGIN offset MAX-BORDER offset)
-          (send dc draw-line offset BOARD-MARGIN offset MAX-BORDER))))
-
-    ;; offset in grid relative to top left corner of sudoku-grid
-    (define/private (offset-in-grid row col)
-      (values (+ (* (sub1 col) CELL-WIDTH) BOARD-MARGIN X-OFFSET)
-              (+ (* (sub1 row) CELL-WIDTH) BOARD-MARGIN Y-OFFSET)))
+          (set! offset (* i CELL-WIDTH))
+          (send dc draw-line 0 offset MAX-BORDER offset)
+          (send dc draw-line offset 0 offset MAX-BORDER))))
 
     ;; offset in grid relative to top left corner of sudoku-grid
     (define/private (top-left-xy-of-cell row col)
-      (values (+ (* (sub1 col) CELL-WIDTH) BOARD-MARGIN)
-              (+ (* (sub1 row) CELL-WIDTH) BOARD-MARGIN)))
+      (values (* (sub1 col) CELL-WIDTH)
+              (* (sub1 row) CELL-WIDTH)))
 
     (define/private (draw-board-numbers dc)
       (send dc set-pen "black" 1 'solid)
@@ -159,14 +156,54 @@
             ;; write digits
             (let ([digit (send sudoku get-value row col)])
               (cond
-                  [(send sudoku is-static? row col)
-                   (draw-cell dc row col "white smoke" "black" digit)]
-                  [(and (not (equal? digit 0))
-                        (get-field easy sudoku)
-                        (not (equal? digit (send sudoku get-value-solved row col))))
-                   (draw-cell dc row col "red" "yellow" digit)]
-                  [else
-                   (draw-cell dc row col "white" "blue" digit)]))))))
+                [(send sudoku is-static? row col)
+                 (draw-cell dc row col "white smoke" "black" digit)]
+                [(and (send sudoku show-warnings?) (send sudoku is-invalid? digit row col))
+                 (draw-cell dc row col "red" "yellow" digit)]
+                [else
+                 (draw-cell dc row col "white" "blue" digit)]))))))
+
+    (define panel
+      (new horizontal-panel%
+           [parent main-frame]
+           [alignment '(left center)]))
+
+    (define (new-game)
+      (send sudoku new-puzzle)
+      (send main-frame refresh))
+    
+    (new button% [parent panel]
+         [label "New"]
+         [min-width 150]
+         [min-height 50]
+         [vert-margin 25]
+         [horiz-margin 12]
+         [font font-buttons]
+         [callback (lambda (button event) (new-game))])
+
+    (define (save-game)
+        (send sudoku save-puzzle)
+        (send main-frame refresh))
+    
+    (new button% [parent panel]
+         [label "Save"]
+         [min-width 150]
+         [min-height 50]
+         [vert-margin 25]
+         [horiz-margin 12]
+         [font font-buttons]
+         [callback (lambda (button event) (save-game))])
+
+    (new check-box% [parent panel]
+         [label "Feedback"]	 
+         [min-width 200]
+         [min-height 50]
+         [vert-margin 25]
+         [horiz-margin 12]
+         [font font-buttons]
+         [callback (lambda (c e)  ;; toggle easy field
+                     (send sudoku toggle-warnings)
+                     (send main-frame refresh))])
 
     (define/private (letter-test letter)
       (define text-size-dc (new bitmap-dc% [bitmap (make-object bitmap% 1 1)]))
