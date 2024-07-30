@@ -9,35 +9,6 @@
 (define sudoku%
   (class object%
     
-    (define warnings #f)
-    ;; activate warning for invalid moves
-    (define/public (toggle-warnings)
-      (set! warnings (not warnings)))
-
-    (define/public (show-warnings?) warnings)
-
-    (define cursor-r 5)
-    (define cursor-c 5)
-
-    (define/public (set-cursor row col)
-      (set!-values (cursor-r cursor-c) (values row col)))
-
-    (define/public (get-cursor)
-      (values cursor-r cursor-c))
-
-    ;; direction oneof 'up 'down 'left 'right -> boolean (#t need refresh)
-    (define/public (move-cursor key)
-      (cond
-        [(and (equal? key 'up) (> cursor-r 1))
-         (set-cursor (sub1 cursor-r) cursor-c)]
-        [(and (equal? key 'down) (< cursor-r 9))
-         (set-cursor (add1 cursor-r) cursor-c)]
-        [(and (equal? key 'left) (> cursor-c 1))
-         (set-cursor cursor-r (sub1 cursor-c))]
-        [(and (equal? key 'right) (< cursor-c 9))
-         (set-cursor cursor-r (add1 cursor-c))]
-        [else #f]))  ; no refresh needed
-
     (define curr-file "")
     (define curr-dir "")
 
@@ -60,10 +31,7 @@
         (set! data-solved (string->vector (first puzzles)))  ; initial puzzle
         (if (not (solve-game))
             (error "puzzle can not be solved!!")
-            (print-puzzle))
-
-        ;; reset cursor to middle of board
-        (set-cursor 5 5)))
+            (print-puzzle))))
 
     (define/public (save-puzzle)
       (let ([string-list (list (vector->string data-static) (vector->string data))])
@@ -84,7 +52,8 @@
          (vector-ref data-static (row-col->index row col))]
         [(equal? mode 'solved)
          (vector-ref data-solved (row-col->index row col))]
-        [else (vector-ref data (row-col->index row col))]))
+        [else
+         (vector-ref data (row-col->index row col))]))
 
     ;; natural natural natural -> void
     (define/public (set-value row col val #:mode [mode 'play])
@@ -160,7 +129,7 @@
               (lambda (port)
                 (for ([s (in-list string-list)])
                   (displayln s port)))
-              #:exists 'truncate/replace)
+              #:exists 'replace)
             (error "no file selected!!"))))
       
     (define/private (char->digit c)
@@ -252,11 +221,6 @@
             (when (equal? (get-value row col #:mode 'solved) 0)
               (set! options (find-options row col))
               (when (equal? (set-count options) 1)
-                (set-value row col (set-first options))))))
+                (set-value row col (set-first options) #:mode 'solved)))))
         (solve)))
     ))
-
-;; (define test (new sudoku% (puzzle my-puzzle)))
-;; (send test print-puzzle)
-;; (send test solve-game)
-;; (send test print-puzzle)
