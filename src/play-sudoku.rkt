@@ -1,15 +1,13 @@
 #! /usr/bin/env racket
 
 #lang racket
-;; play-sudoku.rkt
+;; main.rkt
 
-(require "sudoku.rkt")
-(require "sudoku-gui.rkt")
+;;(require "sudoku.rkt")
+(require "gui.rkt")
 
 (define (main)
-  (let* ([sudoku (new sudoku%)]
-         [sudoku-gui (new sudoku-gui% [sudoku sudoku])])
-    (send sudoku new-puzzle)
+  (let ([sudoku-gui (new sudoku-gui%)])
     (send sudoku-gui start-gui)))
 
 (main)

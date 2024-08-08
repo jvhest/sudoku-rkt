@@ -1,18 +1,21 @@
 #lang racket
 
+(provide get-nyt-sudoku-puzzles)
+
 (require racket/gui/base)
 (require net/url)
 (require json)
 
-(define (digit->char d)
-  (integer->char (+ d 48)))
+(require "util.rkt")
+;; (define (digit->char d)
+;;   (integer->char (+ d 48)))
 
 (define nyt-url "https://www.nytimes.com/puzzles/sudoku/medium")
 (define curr-dir "/home/jvh/workspace/lisp/sudoku-puzzles/")
 
 (define (write-to-file str curr-file)
-  ;;  (let ([fname (put-file #f #f curr-dir curr-file)])
-  (let ([fname (string-append curr-dir curr-file)])
+   (let ([fname (put-file #f #f curr-dir curr-file)])
+  ;; (let ([fname (string-append curr-dir curr-file)])
     (if fname 
         (call-with-output-file fname
           (lambda (port) (displayln str port))
@@ -50,5 +53,4 @@
        (output-filename ht level))
       )))
 
-  (get-nyt-sudoku-puzzles)
-  
+  ;; (get-nyt-sudoku-puzzles)
